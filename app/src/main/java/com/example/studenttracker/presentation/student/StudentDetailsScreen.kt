@@ -25,25 +25,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.studenttracker.data.network.StudentCache
+import com.example.studenttracker.data.network.Student
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentDetailsScreen(
+    student: Student,
     onNavigateBack: () -> Unit,
     onNavigateToEdit: () -> Unit
 ) {
-    val student = StudentCache.selectedStudent
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    if (showDeleteDialog && student != null) {
+    if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Student") },
-            text = { Text("Are you sure you want to delete ${student.name} (${student.rollNumber})? This cannot be undone.") },
+            title = { Text("Deactivate Student") },
+            text = { Text("Are you sure you want to delete ${student.name} (${student.rollNumber})? The profile will be deactivated. Historical records will be retained.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -51,14 +51,15 @@ fun StudentDetailsScreen(
                         coroutineScope.launch {
                             try {
                                 val api = com.example.studenttracker.data.network.NetworkModule.api
-                                val response = api.deleteStudent(com.example.studenttracker.data.network.DeleteStudentRequest(rollNumber = student.rollNumber))
+                                val response = api.deleteStudent(com.example.studenttracker.data.network.DeleteStudentRequest(revision = student.revision, rollNumber = student.rollNumber))
                                 if (response.status == "success") {
-                                    Toast.makeText(context, "Student deleted successfully", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Student deactivated successfully", Toast.LENGTH_SHORT).show()
                                     showDeleteDialog = false
                                     onNavigateBack()
                                 } else {
                                     Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_SHORT).show()
                                 }
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Failed to delete: ${e.toString()}", Toast.LENGTH_LONG).show()
                             } finally {
@@ -71,7 +72,7 @@ fun StudentDetailsScreen(
                     if (isDeleting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
-                        Text("Delete", color = Color.Red)
+                        Text("Deactivate", color = Color.Red)
                     }
                 }
             },
@@ -96,10 +97,10 @@ fun StudentDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToEdit) {
+                    IconButton(onClick = onNavigateToEdit, enabled = !isDeleting) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                     }
-                    IconButton(onClick = { showDeleteDialog = true }) {
+                    IconButton(onClick = { showDeleteDialog = true }, enabled = !isDeleting) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFCF6679))
                     }
                 },
@@ -108,12 +109,6 @@ fun StudentDetailsScreen(
         },
         containerColor = Color(0xFF121212)
     ) { paddingValues ->
-        if (student == null) {
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("Error: No student selected", color = Color.Red)
-            }
-            return@Scaffold
-        }
 
         Column(
             modifier = Modifier
@@ -123,7 +118,7 @@ fun StudentDetailsScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profile Header
+
             Box(
                 modifier = Modifier
                     .size(100.dp)
@@ -136,10 +131,9 @@ fun StudentDetailsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Text(student.name, color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(student.rollNumber, color = Color.Gray, style = MaterialTheme.typography.titleMedium)
-            
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Academic Info Card
             SectionCard(title = "Academic Information") {
                 DetailRow("Department", student.department)
                 DetailRow("Batch", student.batch)
@@ -150,7 +144,6 @@ fun StudentDetailsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Contact Info Card
             SectionCard(title = "Contact Information") {
                 DetailIconRow(Icons.Default.Email, "Email", student.email)
                 DetailIconRow(Icons.Default.Phone, "Phone", student.phone)
@@ -158,13 +151,12 @@ fun StudentDetailsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Parent Info Card
             SectionCard(title = "Parent Information") {
                 DetailRow("Name", student.parentName)
                 DetailIconRow(Icons.Default.Phone, "Phone", student.parentPhone)
                 DetailIconRow(Icons.Default.Email, "Email", student.parentEmail)
             }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
         }
     }

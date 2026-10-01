@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+fun configString(name: String): String = providers.gradleProperty(name)
+    .orElse(providers.environmentVariable(name)).orElse("").get()
+    .let { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }
+
 android {
     namespace = "com.example.studenttracker"
     compileSdk = 37
@@ -13,6 +17,8 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "TRACKER_BASE_URL", configString("TRACKER_BASE_URL"))
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", configString("GOOGLE_WEB_CLIENT_ID"))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -22,7 +28,7 @@ android {
             isMinifyEnabled = false
         }
     }
-    
+
     packaging {
         resources {
             excludes += setOf(
@@ -44,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -65,36 +72,16 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    annotationProcessor("androidx.room:room-compiler:2.6.1")
-
-    // Retrofit & Network
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
-    // Google Sign-In & Auth (Credential Manager)
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
-    // Google Sheets API
-    implementation("com.google.api-client:google-api-client-android:1.33.0")
-    implementation("com.google.apis:google-api-services-sheets:v4-rev20230227-2.0.0") {
-        exclude(group = "org.apache.httpcomponents")
-    }
-
-    // MPAndroidChart (requires jitpack in settings.gradle)
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-
-    // ZXing (QR Code)
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-    implementation("com.google.zxing:core:3.5.3")
-
-    // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // DataStore for session management
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 }

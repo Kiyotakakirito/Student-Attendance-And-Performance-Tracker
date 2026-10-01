@@ -9,7 +9,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// Extension property to create DataStore singleton
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_session")
 
 class UserPreferences(private val context: Context) {
@@ -31,6 +30,7 @@ class UserPreferences(private val context: Context) {
     }
 
     suspend fun clearSession() {
+        com.example.studenttracker.data.network.AuthSession.clear()
         context.dataStore.edit { preferences ->
             preferences.clear()
         }

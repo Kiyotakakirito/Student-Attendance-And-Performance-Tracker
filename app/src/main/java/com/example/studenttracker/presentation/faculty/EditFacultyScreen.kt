@@ -10,13 +10,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.studenttracker.data.network.FacultyCache
+import com.example.studenttracker.data.network.Faculty
 import com.example.studenttracker.data.network.NetworkModule
 import com.example.studenttracker.data.network.UpdateFacultyRequest
 import kotlinx.coroutines.launch
@@ -24,35 +25,32 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditFacultyScreen(
+    faculty: Faculty,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val faculty = FacultyCache.selectedFaculty
-    
-    if (faculty == null) {
-        LaunchedEffect(Unit) { onNavigateBack() }
-        return
-    }
 
-    var name by remember { mutableStateOf(faculty.name) }
-    var email by remember { mutableStateOf(faculty.email) }
-    var phone by remember { mutableStateOf(faculty.phone) }
-    var department by remember { mutableStateOf(faculty.department) }
-    var designation by remember { mutableStateOf(faculty.designation) }
-    var joiningDate by remember { mutableStateOf(faculty.joiningDate) }
+    var name by rememberSaveable { mutableStateOf(faculty.name) }
+    var email by rememberSaveable { mutableStateOf(faculty.email) }
+    var phone by rememberSaveable { mutableStateOf(faculty.phone) }
+    var department by rememberSaveable { mutableStateOf(faculty.department) }
+    var designation by rememberSaveable { mutableStateOf(faculty.designation) }
+    var joiningDate by rememberSaveable { mutableStateOf(faculty.joiningDate) }
 
     var isLoading by remember { mutableStateOf(false) }
 
     var showUnsavedDialog by remember { mutableStateOf(false) }
-    val hasUnsavedChanges = name != faculty.name || email != faculty.email || phone != faculty.phone || department != faculty.department || designation != faculty.designation
-    
-    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges) {
-        showUnsavedDialog = true
+    val hasUnsavedChanges = name != faculty.name || email != faculty.email || phone != faculty.phone || department != faculty.department || designation != faculty.designation || joiningDate != faculty.joiningDate
+
+    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges || isLoading) {
+        if (!isLoading) showUnsavedDialog = true
     }
-    
+
     val handleBackPress = {
-        if (hasUnsavedChanges) {
+        if (isLoading) {
+
+        } else if (hasUnsavedChanges) {
             showUnsavedDialog = true
         } else {
             onNavigateBack()
@@ -99,16 +97,16 @@ fun EditFacultyScreen(
             Text("Employee ID: ${faculty.employeeId} (Cannot be changed)", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
 
             Text("Professional Info", color = Color(0xFF03DAC5), fontWeight = FontWeight.Bold)
-            CustomTextField(value = name, onValueChange = { name = it }, label = "Full Name")
-            CustomTextField(value = email, onValueChange = { email = it }, label = "Email", keyboardType = KeyboardType.Email)
-            CustomTextField(value = phone, onValueChange = { phone = it }, label = "Phone Number", keyboardType = KeyboardType.Phone)
+            CustomTextField(value = name, onValueChange = { name = it }, label = "Full Name", enabled = !isLoading)
+            CustomTextField(value = email, onValueChange = { email = it }, label = "Email", keyboardType = KeyboardType.Email, enabled = !isLoading)
+            CustomTextField(value = phone, onValueChange = { phone = it }, label = "Phone Number", keyboardType = KeyboardType.Phone, enabled = !isLoading)
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CustomTextField(value = department, onValueChange = { department = it }, label = "Department", modifier = Modifier.weight(1f))
-                CustomTextField(value = designation, onValueChange = { designation = it }, label = "Designation", modifier = Modifier.weight(1f))
+                CustomTextField(value = department, onValueChange = { department = it }, label = "Department", modifier = Modifier.weight(1f), enabled = !isLoading)
+                CustomTextField(value = designation, onValueChange = { designation = it }, label = "Designation", modifier = Modifier.weight(1f), enabled = !isLoading)
             }
-            
-            CustomTextField(value = joiningDate, onValueChange = { joiningDate = it }, label = "Joining Date")
+
+            CustomTextField(value = joiningDate, onValueChange = { joiningDate = it }, label = "Joining Date", enabled = !isLoading)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -118,11 +116,12 @@ fun EditFacultyScreen(
                         Toast.makeText(context, "All required fields must be filled", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    
+
                     isLoading = true
                     coroutineScope.launch {
                         try {
                             val request = UpdateFacultyRequest(
+                                revision = faculty.revision,
                                 employeeId = faculty.employeeId,
                                 name = name.trim(),
                                 email = email.trim(),
@@ -133,20 +132,12 @@ fun EditFacultyScreen(
                             )
                             val response = NetworkModule.api.updateFaculty(request)
                             if (response.status == "success") {
-                                FacultyCache.selectedFaculty = com.example.studenttracker.data.network.Faculty(
-                                    employeeId = faculty.employeeId,
-                                    name = name.trim(),
-                                    email = email.trim(),
-                                    phone = phone.trim(),
-                                    department = department.trim(),
-                                    designation = designation.trim(),
-                                    joiningDate = joiningDate.trim()
-                                )
                                 Toast.makeText(context, "Faculty updated successfully", Toast.LENGTH_SHORT).show()
                                 onNavigateBack()
                             } else {
                                 Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                             }
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e
                         } catch (e: Exception) {
                             Toast.makeText(context, "Failed to update: ${e.message}", Toast.LENGTH_LONG).show()
                         } finally {
@@ -176,9 +167,11 @@ fun CustomTextField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    enabled: Boolean = true
 ) {
     OutlinedTextField(
+        enabled = enabled,
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },

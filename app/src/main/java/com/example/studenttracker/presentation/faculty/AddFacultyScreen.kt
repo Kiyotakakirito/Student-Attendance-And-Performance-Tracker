@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -26,14 +27,14 @@ fun AddFacultyScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    
-    var employeeId by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var department by remember { mutableStateOf("") }
-    var designation by remember { mutableStateOf("") }
-    var joiningDate by remember { mutableStateOf("") }
+
+    var employeeId by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var department by rememberSaveable { mutableStateOf("") }
+    var designation by rememberSaveable { mutableStateOf("") }
+    var joiningDate by rememberSaveable { mutableStateOf("") }
 
     var isError by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
@@ -45,7 +46,7 @@ fun AddFacultyScreen(
             Toast.makeText(context, "Please fill in all required fields", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         isSaving = true
         coroutineScope.launch {
             try {
@@ -65,6 +66,7 @@ fun AddFacultyScreen(
                 } else {
                     Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
@@ -74,14 +76,16 @@ fun AddFacultyScreen(
     }
 
     var showUnsavedDialog by remember { mutableStateOf(false) }
-    val hasUnsavedChanges = employeeId.isNotBlank() || name.isNotBlank() || email.isNotBlank()
-    
-    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges) {
-        showUnsavedDialog = true
+    val hasUnsavedChanges = employeeId.isNotBlank() || name.isNotBlank() || email.isNotBlank() || phone.isNotBlank() || department.isNotBlank() || designation.isNotBlank() || joiningDate.isNotBlank()
+
+    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges || isSaving) {
+        if (!isSaving) showUnsavedDialog = true
     }
-    
+
     val handleBackPress = {
-        if (hasUnsavedChanges) {
+        if (isSaving) {
+
+        } else if (hasUnsavedChanges) {
             showUnsavedDialog = true
         } else {
             onNavigateBack()
@@ -126,30 +130,34 @@ fun AddFacultyScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Faculty Details", color = Color(0xFF03DAC5), style = MaterialTheme.typography.titleMedium)
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = employeeId, onValueChange = { employeeId = it },
                 label = { Text("Employee ID *") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && employeeId.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = name, onValueChange = { name = it },
                 label = { Text("Full Name *") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && name.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = email, onValueChange = { email = it },
                 label = { Text("Email *") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && email.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = phone, onValueChange = { phone = it },
                 label = { Text("Phone Number") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -161,12 +169,14 @@ fun AddFacultyScreen(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = department, onValueChange = { department = it },
                     label = { Text("Department *") },
                     modifier = Modifier.weight(1f),
                     isError = isError && department.isBlank()
                 )
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = designation, onValueChange = { designation = it },
                     label = { Text("Designation *") },
                     modifier = Modifier.weight(1f),
@@ -175,6 +185,7 @@ fun AddFacultyScreen(
             }
 
             OutlinedTextField(
+                enabled = !isSaving,
                 value = joiningDate, onValueChange = { joiningDate = it },
                 label = { Text("Joining Date (YYYY-MM-DD)") },
                 modifier = Modifier.fillMaxWidth()

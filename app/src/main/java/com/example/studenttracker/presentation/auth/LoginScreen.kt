@@ -1,7 +1,5 @@
 package com.example.studenttracker.presentation.auth
 
-import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,11 +18,16 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
+import com.example.studenttracker.BuildConfig
+import com.example.studenttracker.data.network.AuthSession
+import com.example.studenttracker.data.network.SignedInUser
 import com.example.studenttracker.data.network.NetworkModule
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableStateOf
@@ -40,18 +43,18 @@ fun LoginScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = CredentialManager.create(context)
-    
+
     var isLoading by remember { mutableStateOf(false) }
 
-    // Using the Web Client ID provided by the user
-    val webClientId = "172023820889-761d0e5evulp4nbiqoqia3tqsqt2kuij.apps.googleusercontent.com"
+    var loginError by remember { mutableStateOf<String?>(null) }
+    val webClientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
 
     fun initiateGoogleSignIn() {
-        if (webClientId == "YOUR_WEB_CLIENT_ID") {
-            Toast.makeText(context, "Please set your WEB_CLIENT_ID in LoginScreen.kt", Toast.LENGTH_LONG).show()
+        if (!NetworkModule.isConfigured) {
+            loginError = "This app has not been connected to your institution yet. Contact the administrator."
             return
         }
-
+        loginError = null
         coroutineScope.launch {
             try {
                 isLoading = true
@@ -73,36 +76,29 @@ fun LoginScreen(
                 val credential = result.credential
                 if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    val email = googleIdTokenCredential.id
-                    
-                    Log.d("Auth", "Successfully signed in! Email: $email")
-                    Toast.makeText(context, "Verifying role for $email...", Toast.LENGTH_SHORT).show()
-                    
-                    // Call our Google Sheets Apps Script API!
-                    try {
-                        val response = withContext(Dispatchers.IO) {
-                            NetworkModule.api.getUserRole(email)
-                        }
-                        
-                        Log.d("Auth", "API Response: $response")
-                        Toast.makeText(context, "Welcome! Role: ${response.role}", Toast.LENGTH_LONG).show()
-                        
-                        // Save session
-                        userPreferences.saveSession(email = response.email, role = response.role)
-                        
-                        onLoginSuccess(response.role)
-                        
-                    } catch (e: Exception) {
-                        Log.e("Auth", "Network Error checking role", e)
-                        Toast.makeText(context, "Network Error checking role", Toast.LENGTH_LONG).show()
+                    AuthSession.begin(googleIdTokenCredential.idToken)
+                    val response = withContext(Dispatchers.IO) { NetworkModule.api.getUserRole() }
+                    check(response.status == "success" && response.role in setOf("admin", "faculty", "student") && response.expiresAt > System.currentTimeMillis() / 1000) {
+                        "Your account does not have an active role. Contact the administrator."
                     }
+                    userPreferences.saveSession(response.email, response.role)
+                    AuthSession.complete(SignedInUser(response.email, response.name.orEmpty(), response.role, response.expiresAt))
+                    onLoginSuccess(response.role)
+                } else {
+                    error("Google returned an unsupported credential. Try signing in again.")
                 }
+            } catch (e: CancellationException) {
+                AuthSession.clear()
+                throw e
+            } catch (e: NoCredentialException) {
+                AuthSession.clear()
+                loginError = "No Google account is available. Add an account to your device and try again."
             } catch (e: GetCredentialException) {
-                Log.e("Auth", "Google Sign-In failed: ${e.type}", e)
-                Toast.makeText(context, "Auth Error: ${e.type.substringAfterLast('.')}", Toast.LENGTH_LONG).show()
+                AuthSession.clear()
+                loginError = "Sign-in was cancelled or unavailable. Please try again."
             } catch (e: Exception) {
-                Log.e("Auth", "Unexpected error", e)
-                Toast.makeText(context, "Unexpected Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                AuthSession.clear()
+                loginError = e.message ?: "Unable to sign in. Please try again."
             } finally {
                 isLoading = false
             }
@@ -112,6 +108,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .safeDrawingPadding()
             .background(Color(0xFF121212)),
         contentAlignment = Alignment.Center
     ) {
@@ -142,7 +139,9 @@ fun LoginScreen(
                 color = Color.Gray,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            loginError?.let { Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }
+            Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = { initiateGoogleSignIn() },
                 enabled = !isLoading,

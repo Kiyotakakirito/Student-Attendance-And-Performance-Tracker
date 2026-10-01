@@ -10,13 +10,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.studenttracker.data.network.SubjectCache
+import com.example.studenttracker.data.network.Subject
 import com.example.studenttracker.data.network.NetworkModule
 import com.example.studenttracker.data.network.UpdateSubjectRequest
 import kotlinx.coroutines.launch
@@ -24,33 +25,30 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditSubjectScreen(
+    subject: Subject,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val subject = SubjectCache.selectedSubject
-    
-    if (subject == null) {
-        LaunchedEffect(Unit) { onNavigateBack() }
-        return
-    }
 
-    var subjectName by remember { mutableStateOf(subject.subjectName) }
-    var facultyId by remember { mutableStateOf(subject.facultyId) }
-    var semester by remember { mutableStateOf(subject.semester) }
-    var totalClasses by remember { mutableStateOf(subject.totalClasses) }
+    var subjectName by rememberSaveable { mutableStateOf(subject.subjectName) }
+    var facultyId by rememberSaveable { mutableStateOf(subject.facultyId) }
+    var semester by rememberSaveable { mutableStateOf(subject.semester) }
+    var totalClasses by rememberSaveable { mutableStateOf(subject.totalClasses) }
 
     var isLoading by remember { mutableStateOf(false) }
 
     var showUnsavedDialog by remember { mutableStateOf(false) }
     val hasUnsavedChanges = subjectName != subject.subjectName || facultyId != subject.facultyId || semester != subject.semester || totalClasses != subject.totalClasses
-    
-    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges) {
-        showUnsavedDialog = true
+
+    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges || isLoading) {
+        if (!isLoading) showUnsavedDialog = true
     }
-    
+
     val handleBackPress = {
-        if (hasUnsavedChanges) {
+        if (isLoading) {
+
+        } else if (hasUnsavedChanges) {
             showUnsavedDialog = true
         } else {
             onNavigateBack()
@@ -96,14 +94,14 @@ fun EditSubjectScreen(
         ) {
             Text("Subject Code: ${subject.subjectCode} (Cannot be changed)", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
 
-            CustomTextField(value = subjectName, onValueChange = { subjectName = it }, label = "Subject Name")
-            CustomTextField(value = facultyId, onValueChange = { facultyId = it }, label = "Assigned Faculty ID")
+            CustomTextField(value = subjectName, onValueChange = { subjectName = it }, label = "Subject Name", enabled = !isLoading)
+            CustomTextField(value = facultyId, onValueChange = { facultyId = it }, label = "Assigned Faculty ID", enabled = !isLoading)
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CustomTextField(value = semester, onValueChange = { semester = it }, label = "Semester", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
-                CustomTextField(value = totalClasses, onValueChange = { totalClasses = it }, label = "Total Classes", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number)
+                CustomTextField(value = semester, onValueChange = { semester = it }, label = "Semester", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number, enabled = !isLoading)
+                CustomTextField(value = totalClasses, onValueChange = { totalClasses = it }, label = "Total Classes", modifier = Modifier.weight(1f), keyboardType = KeyboardType.Number, enabled = !isLoading)
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
@@ -112,11 +110,12 @@ fun EditSubjectScreen(
                         Toast.makeText(context, "All required fields must be filled", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    
+
                     isLoading = true
                     coroutineScope.launch {
                         try {
                             val request = UpdateSubjectRequest(
+                                revision = subject.revision,
                                 subjectCode = subject.subjectCode,
                                 subjectName = subjectName.trim(),
                                 facultyId = facultyId.trim(),
@@ -125,18 +124,12 @@ fun EditSubjectScreen(
                             )
                             val response = NetworkModule.api.updateSubject(request)
                             if (response.status == "success") {
-                                SubjectCache.selectedSubject = com.example.studenttracker.data.network.Subject(
-                                    subjectCode = subject.subjectCode,
-                                    subjectName = subjectName.trim(),
-                                    facultyId = facultyId.trim(),
-                                    semester = semester.trim(),
-                                    totalClasses = totalClasses.trim()
-                                )
                                 Toast.makeText(context, "Subject updated successfully", Toast.LENGTH_SHORT).show()
                                 onNavigateBack()
                             } else {
                                 Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                             }
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e
                         } catch (e: Exception) {
                             Toast.makeText(context, "Failed to update: ${e.message}", Toast.LENGTH_LONG).show()
                         } finally {
@@ -166,9 +159,11 @@ fun CustomTextField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    enabled: Boolean = true
 ) {
     OutlinedTextField(
+        enabled = enabled,
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },

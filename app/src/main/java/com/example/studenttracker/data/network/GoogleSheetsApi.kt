@@ -6,7 +6,6 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-// Models
 data class AddStudentRequest(
     val action: String = "addStudent",
     val rollNumber: String,
@@ -24,6 +23,7 @@ data class AddStudentRequest(
 )
 
 data class UpdateStudentRequest(
+    val revision: Int = 0,
     val action: String = "updateStudent",
     val rollNumber: String,
     val name: String,
@@ -40,6 +40,7 @@ data class UpdateStudentRequest(
 )
 
 data class DeleteStudentRequest(
+    val revision: Int = 0,
     val action: String = "deleteStudent",
     val rollNumber: String
 )
@@ -50,6 +51,7 @@ data class ApiResponse(
 )
 
 data class Student(
+    val revision: Int = 0,
     val rollNumber: String,
     val name: String,
     val email: String,
@@ -64,17 +66,12 @@ data class Student(
     val parentEmail: String
 )
 
-object StudentCache {
-    var selectedStudent: Student? = null
-}
-
 data class StudentListResponse(
     val status: String,
     val students: List<Student>? = null,
     val message: String? = null
 )
 
-// Faculty Models
 data class AddFacultyRequest(
     val action: String = "addFaculty",
     val employeeId: String,
@@ -87,6 +84,7 @@ data class AddFacultyRequest(
 )
 
 data class UpdateFacultyRequest(
+    val revision: Int = 0,
     val action: String = "updateFaculty",
     val employeeId: String,
     val name: String,
@@ -98,11 +96,13 @@ data class UpdateFacultyRequest(
 )
 
 data class DeleteFacultyRequest(
+    val revision: Int = 0,
     val action: String = "deleteFaculty",
     val employeeId: String
 )
 
 data class Faculty(
+    val revision: Int = 0,
     val employeeId: String,
     val name: String,
     val email: String,
@@ -112,17 +112,12 @@ data class Faculty(
     val joiningDate: String
 )
 
-object FacultyCache {
-    var selectedFaculty: Faculty? = null
-}
-
 data class FacultyListResponse(
     val status: String,
     val faculty: List<Faculty>? = null,
     val message: String? = null
 )
 
-// Subject Models
 data class AddSubjectRequest(
     val action: String = "addSubject",
     val subjectCode: String,
@@ -133,6 +128,7 @@ data class AddSubjectRequest(
 )
 
 data class UpdateSubjectRequest(
+    val revision: Int = 0,
     val action: String = "updateSubject",
     val subjectCode: String,
     val subjectName: String,
@@ -142,11 +138,13 @@ data class UpdateSubjectRequest(
 )
 
 data class DeleteSubjectRequest(
+    val revision: Int = 0,
     val action: String = "deleteSubject",
     val subjectCode: String
 )
 
 data class Subject(
+    val revision: Int = 0,
     val subjectCode: String,
     val subjectName: String,
     val facultyId: String,
@@ -154,17 +152,12 @@ data class Subject(
     val totalClasses: String
 )
 
-object SubjectCache {
-    var selectedSubject: Subject? = null
-}
-
 data class SubjectListResponse(
     val status: String,
     val subjects: List<Subject>? = null,
     val message: String? = null
 )
 
-// Attendance Models
 data class AttendanceReportItem(
     val studentId: String,
     val name: String,
@@ -181,17 +174,37 @@ data class AttendanceReportResponse(
 
 interface GoogleSheetsApi {
     @GET("exec")
-    suspend fun getUserRole(@Query("email") email: String): UserRoleResponse
+    suspend fun getStudent(@Query("rollNumber") rollNumber: String, @Query("action") action: String = "getStudent"): StudentResponse
+    @GET("exec")
+    suspend fun getFacultyMember(@Query("employeeId") employeeId: String, @Query("action") action: String = "getFacultyMember"): FacultyResponse
+    @GET("exec")
+    suspend fun getSubject(@Query("subjectCode") subjectCode: String, @Query("action") action: String = "getSubject"): SubjectResponse
+    @GET("exec")
+    suspend fun getDashboard(@Query("action") action: String = "getDashboard"): DashboardResponse
+    @GET("exec")
+    suspend fun getRoster(@Query("subjectCode") subjectCode: String, @Query("action") action: String = "getRoster"): RosterResponse
+    @POST("exec")
+    suspend fun saveEnrollment(@Body request: EnrollmentRequest): ApiResponse
+    @POST("exec")
+    suspend fun saveAttendance(@Body request: AttendanceRequest): ApiResponse
+    @GET("exec")
+    suspend fun getAssessments(@Query("subjectCode") subjectCode: String, @Query("action") action: String = "getAssessments"): AssessmentsResponse
+    @POST("exec")
+    suspend fun saveAssessment(@Body request: AssessmentRequest): AssessmentResponse
+    @GET("exec")
+    suspend fun getMyProgress(@Query("action") action: String = "getMyProgress"): ProgressResponse
+    @GET("exec")
+    suspend fun getUserRole(@Query("action") action: String = "getUserRole"): UserRoleResponse
 
     @GET("exec")
     suspend fun getStudents(@Query("action") action: String = "getStudents"): StudentListResponse
 
     @POST("exec")
     suspend fun addStudent(@Body request: AddStudentRequest): ApiResponse
-    
+
     @POST("exec")
     suspend fun updateStudent(@Body request: UpdateStudentRequest): ApiResponse
-    
+
     @POST("exec")
     suspend fun deleteStudent(@Body request: DeleteStudentRequest): ApiResponse
 
@@ -200,10 +213,10 @@ interface GoogleSheetsApi {
 
     @POST("exec")
     suspend fun addFaculty(@Body request: AddFacultyRequest): ApiResponse
-    
+
     @POST("exec")
     suspend fun updateFaculty(@Body request: UpdateFacultyRequest): ApiResponse
-    
+
     @POST("exec")
     suspend fun deleteFaculty(@Body request: DeleteFacultyRequest): ApiResponse
 
@@ -212,13 +225,13 @@ interface GoogleSheetsApi {
 
     @POST("exec")
     suspend fun addSubject(@Body request: AddSubjectRequest): ApiResponse
-    
+
     @POST("exec")
     suspend fun updateSubject(@Body request: UpdateSubjectRequest): ApiResponse
-    
+
     @POST("exec")
     suspend fun deleteSubject(@Body request: DeleteSubjectRequest): ApiResponse
-    
+
     @GET("exec")
     suspend fun getAttendanceReport(
         @Query("action") action: String = "getAttendanceReport",

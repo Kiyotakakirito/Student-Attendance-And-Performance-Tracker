@@ -20,32 +20,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.studenttracker.data.network.DeleteSubjectRequest
-import com.example.studenttracker.data.network.SubjectCache
+import com.example.studenttracker.data.network.Subject
 import com.example.studenttracker.data.network.NetworkModule
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubjectDetailsScreen(
+    subject: Subject,
     onNavigateBack: () -> Unit,
     onNavigateToEdit: () -> Unit
 ) {
-    val subject = SubjectCache.selectedSubject
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    if (subject == null) {
-        LaunchedEffect(Unit) { onNavigateBack() }
-        return
-    }
-
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Subject", color = Color.White) },
-            text = { Text("Are you sure you want to remove ${subject.subjectName}? This action cannot be undone.", color = Color.LightGray) },
+            title = { Text("Deactivate Subject", color = Color.White) },
+            text = { Text("Are you sure you want to remove ${subject.subjectName}? The profile will be deactivated; historical records will be retained.", color = Color.LightGray) },
             containerColor = Color(0xFF1E1E1E),
             confirmButton = {
                 TextButton(
@@ -53,14 +48,15 @@ fun SubjectDetailsScreen(
                         isDeleting = true
                         coroutineScope.launch {
                             try {
-                                val response = NetworkModule.api.deleteSubject(DeleteSubjectRequest(subjectCode = subject.subjectCode))
+                                val response = NetworkModule.api.deleteSubject(DeleteSubjectRequest(revision = subject.revision, subjectCode = subject.subjectCode))
                                 if (response.status == "success") {
-                                    Toast.makeText(context, "Subject deleted", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Subject deactivated", Toast.LENGTH_SHORT).show()
                                     showDeleteDialog = false
                                     onNavigateBack()
                                 } else {
                                     Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                                 }
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Failed to delete: ${e.message}", Toast.LENGTH_LONG).show()
                             } finally {
@@ -95,10 +91,10 @@ fun SubjectDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToEdit) {
+                    IconButton(onClick = onNavigateToEdit, enabled = !isDeleting) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                     }
-                    IconButton(onClick = { showDeleteDialog = true }) {
+                    IconButton(onClick = { showDeleteDialog = true }, enabled = !isDeleting) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
                     }
                 },
@@ -127,7 +123,7 @@ fun SubjectDetailsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Text(subject.subjectName, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
             Text(subject.subjectCode, style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
-            
+
             Spacer(modifier = Modifier.height(32.dp))
 
             Card(

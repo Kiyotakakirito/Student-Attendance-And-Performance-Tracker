@@ -20,32 +20,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.studenttracker.data.network.DeleteFacultyRequest
-import com.example.studenttracker.data.network.FacultyCache
+import com.example.studenttracker.data.network.Faculty
 import com.example.studenttracker.data.network.NetworkModule
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FacultyDetailsScreen(
+    faculty: Faculty,
     onNavigateBack: () -> Unit,
     onNavigateToEdit: () -> Unit
 ) {
-    val faculty = FacultyCache.selectedFaculty
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    if (faculty == null) {
-        LaunchedEffect(Unit) { onNavigateBack() }
-        return
-    }
-
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Faculty", color = Color.White) },
-            text = { Text("Are you sure you want to remove ${faculty.name}? This action cannot be undone.", color = Color.LightGray) },
+            title = { Text("Deactivate Faculty", color = Color.White) },
+            text = { Text("Are you sure you want to remove ${faculty.name}? The profile will be deactivated; historical records will be retained.", color = Color.LightGray) },
             containerColor = Color(0xFF1E1E1E),
             confirmButton = {
                 TextButton(
@@ -53,14 +48,15 @@ fun FacultyDetailsScreen(
                         isDeleting = true
                         coroutineScope.launch {
                             try {
-                                val response = NetworkModule.api.deleteFaculty(DeleteFacultyRequest(employeeId = faculty.employeeId))
+                                val response = NetworkModule.api.deleteFaculty(DeleteFacultyRequest(revision = faculty.revision, employeeId = faculty.employeeId))
                                 if (response.status == "success") {
-                                    Toast.makeText(context, "Faculty deleted", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Faculty deactivated", Toast.LENGTH_SHORT).show()
                                     showDeleteDialog = false
-                                    onNavigateBack() // Go back to list
+                                    onNavigateBack()
                                 } else {
                                     Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                                 }
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Failed to delete: ${e.message}", Toast.LENGTH_LONG).show()
                             } finally {
@@ -95,10 +91,10 @@ fun FacultyDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToEdit) {
+                    IconButton(onClick = onNavigateToEdit, enabled = !isDeleting) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                     }
-                    IconButton(onClick = { showDeleteDialog = true }) {
+                    IconButton(onClick = { showDeleteDialog = true }, enabled = !isDeleting) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
                     }
                 },
@@ -127,7 +123,7 @@ fun FacultyDetailsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Text(faculty.name, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
             Text(faculty.employeeId, style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
-            
+
             Spacer(modifier = Modifier.height(32.dp))
 
             Card(

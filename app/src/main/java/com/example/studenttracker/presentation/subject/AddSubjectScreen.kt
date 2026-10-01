@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -26,12 +27,12 @@ fun AddSubjectScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    
-    var subjectCode by remember { mutableStateOf("") }
-    var subjectName by remember { mutableStateOf("") }
-    var facultyId by remember { mutableStateOf("") }
-    var semester by remember { mutableStateOf("") }
-    var totalClasses by remember { mutableStateOf("") }
+
+    var subjectCode by rememberSaveable { mutableStateOf("") }
+    var subjectName by rememberSaveable { mutableStateOf("") }
+    var facultyId by rememberSaveable { mutableStateOf("") }
+    var semester by rememberSaveable { mutableStateOf("") }
+    var totalClasses by rememberSaveable { mutableStateOf("") }
 
     var isError by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
@@ -43,7 +44,7 @@ fun AddSubjectScreen(
             Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         isSaving = true
         coroutineScope.launch {
             try {
@@ -61,6 +62,7 @@ fun AddSubjectScreen(
                 } else {
                     Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
@@ -70,14 +72,16 @@ fun AddSubjectScreen(
     }
 
     var showUnsavedDialog by remember { mutableStateOf(false) }
-    val hasUnsavedChanges = subjectCode.isNotBlank() || subjectName.isNotBlank()
-    
-    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges) {
-        showUnsavedDialog = true
+    val hasUnsavedChanges = subjectCode.isNotBlank() || subjectName.isNotBlank() || facultyId.isNotBlank() || semester.isNotBlank() || totalClasses.isNotBlank()
+
+    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges || isSaving) {
+        if (!isSaving) showUnsavedDialog = true
     }
-    
+
     val handleBackPress = {
-        if (hasUnsavedChanges) {
+        if (isSaving) {
+
+        } else if (hasUnsavedChanges) {
             showUnsavedDialog = true
         } else {
             onNavigateBack()
@@ -122,15 +126,17 @@ fun AddSubjectScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Subject Details", color = Color(0xFF3700B3), style = MaterialTheme.typography.titleMedium)
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = subjectCode, onValueChange = { subjectCode = it },
                 label = { Text("Subject Code (e.g., CS101) *") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && subjectCode.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = subjectName, onValueChange = { subjectName = it },
                 label = { Text("Subject Name *") },
                 modifier = Modifier.fillMaxWidth(),
@@ -139,8 +145,9 @@ fun AddSubjectScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
             Text("Assignment & Curriculum", color = Color(0xFF3700B3), style = MaterialTheme.typography.titleMedium)
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = facultyId, onValueChange = { facultyId = it },
                 label = { Text("Assigned Faculty ID *") },
                 modifier = Modifier.fillMaxWidth(),
@@ -149,6 +156,7 @@ fun AddSubjectScreen(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = semester, onValueChange = { semester = it },
                     label = { Text("Semester *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -156,6 +164,7 @@ fun AddSubjectScreen(
                     isError = isError && semester.isBlank()
                 )
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = totalClasses, onValueChange = { totalClasses = it },
                     label = { Text("Total Classes *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

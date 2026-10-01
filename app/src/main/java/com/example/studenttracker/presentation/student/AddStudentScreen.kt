@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -22,20 +23,19 @@ fun AddStudentScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    
-    // Form State
-    var rollNumber by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var parentName by remember { mutableStateOf("") }
-    var parentPhone by remember { mutableStateOf("") }
-    var parentEmail by remember { mutableStateOf("") }
-    var department by remember { mutableStateOf("") }
-    var year by remember { mutableStateOf("") }
-    var semester by remember { mutableStateOf("") }
-    var section by remember { mutableStateOf("") }
-    var batch by remember { mutableStateOf("") }
+
+    var rollNumber by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var parentName by rememberSaveable { mutableStateOf("") }
+    var parentPhone by rememberSaveable { mutableStateOf("") }
+    var parentEmail by rememberSaveable { mutableStateOf("") }
+    var department by rememberSaveable { mutableStateOf("") }
+    var year by rememberSaveable { mutableStateOf("") }
+    var semester by rememberSaveable { mutableStateOf("") }
+    var section by rememberSaveable { mutableStateOf("") }
+    var batch by rememberSaveable { mutableStateOf("") }
 
     var isError by remember { mutableStateOf(false) }
 
@@ -57,7 +57,7 @@ fun AddStudentScreen(
             Toast.makeText(context, "Invalid Email Format (e.g., student@college.edu)", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         isSaving = true
         coroutineScope.launch {
             try {
@@ -76,7 +76,7 @@ fun AddStudentScreen(
                     parentPhone = parentPhone.trim(),
                     parentEmail = parentEmail.trim()
                 )
-                
+
                 val response = api.addStudent(request)
                 if (response.status == "success") {
                     Toast.makeText(context, "Student saved successfully!", Toast.LENGTH_SHORT).show()
@@ -84,6 +84,7 @@ fun AddStudentScreen(
                 } else {
                     Toast.makeText(context, "Error: ${response.message}", Toast.LENGTH_LONG).show()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
@@ -109,14 +110,16 @@ fun AddStudentScreen(
     }
 
     var showUnsavedDialog by remember { mutableStateOf(false) }
-    val hasUnsavedChanges = rollNumber.isNotBlank() || name.isNotBlank() || email.isNotBlank()
-    
-    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges) {
-        showUnsavedDialog = true
+    val hasUnsavedChanges = rollNumber.isNotBlank() || name.isNotBlank() || email.isNotBlank() || phone.isNotBlank() || department.isNotBlank() || batch.isNotBlank() || year.isNotBlank() || semester.isNotBlank() || section.isNotBlank() || parentName.isNotBlank() || parentPhone.isNotBlank() || parentEmail.isNotBlank()
+
+    androidx.activity.compose.BackHandler(enabled = hasUnsavedChanges || isSaving) {
+        if (!isSaving) showUnsavedDialog = true
     }
-    
+
     val handleBackPress = {
-        if (hasUnsavedChanges) {
+        if (isSaving) {
+
+        } else if (hasUnsavedChanges) {
             showUnsavedDialog = true
         } else {
             onNavigateBack()
@@ -143,7 +146,7 @@ fun AddStudentScreen(
             TopAppBar(
                 title = { Text("Add New Student", color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = handleBackPress) { 
+                    IconButton(onClick = handleBackPress) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 },
@@ -161,30 +164,34 @@ fun AddStudentScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Student Details", color = Color(0xFFBB86FC), style = MaterialTheme.typography.titleMedium)
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = rollNumber, onValueChange = { rollNumber = it },
                 label = { Text("Roll Number *") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && rollNumber.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = name, onValueChange = { name = it },
                 label = { Text("Full Name *") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && name.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = email, onValueChange = { email = it },
                 label = { Text("Email *") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth(),
                 isError = isError && email.isBlank()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = phone, onValueChange = { phone = it },
                 label = { Text("Phone Number") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -196,12 +203,14 @@ fun AddStudentScreen(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = department, onValueChange = { department = it },
                     label = { Text("Department *") },
                     modifier = Modifier.weight(1f),
                     isError = isError && department.isBlank()
                 )
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = batch, onValueChange = { batch = it },
                     label = { Text("Batch") },
                     modifier = Modifier.weight(1f)
@@ -210,16 +219,19 @@ fun AddStudentScreen(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = year, onValueChange = { year = it },
                     label = { Text("Year") },
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = semester, onValueChange = { semester = it },
                     label = { Text("Semester") },
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
+                enabled = !isSaving,
                     value = section, onValueChange = { section = it },
                     label = { Text("Section") },
                     modifier = Modifier.weight(1f)
@@ -230,19 +242,22 @@ fun AddStudentScreen(
             Text("Parent/Guardian Info", color = Color(0xFFBB86FC), style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
+                enabled = !isSaving,
                 value = parentName, onValueChange = { parentName = it },
                 label = { Text("Parent Name") },
                 modifier = Modifier.fillMaxWidth()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = parentPhone, onValueChange = { parentPhone = it },
                 label = { Text("Parent Phone") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth()
             )
-            
+
             OutlinedTextField(
+                enabled = !isSaving,
                 value = parentEmail, onValueChange = { parentEmail = it },
                 label = { Text("Parent Email") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -251,20 +266,20 @@ fun AddStudentScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 OutlinedButton(
                     onClick = { resetForm() },
+                    enabled = !isSaving,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) {
                     Text("Reset")
                 }
-                
+
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TextButton(onClick = onNavigateBack) {
+                    TextButton(onClick = handleBackPress) {
                         Text("Cancel", color = Color.Gray)
                     }
                     Button(
